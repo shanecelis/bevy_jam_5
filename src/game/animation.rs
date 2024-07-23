@@ -35,6 +35,7 @@ fn update_animation_movement(
 ) {
     for (controller, mut sprite, mut animation) in &mut player_query {
         let dx = controller.0.x;
+        let dy = controller.0.y;
         if dx != 0.0 {
             sprite.flip_x = dx < 0.0;
         }
@@ -42,7 +43,13 @@ fn update_animation_movement(
         let animation_state = if controller.0 == Vec2::ZERO {
             PlayerAnimationState::Idling
         } else {
-            PlayerAnimationState::Walking
+            if dy > 0.0 {
+                PlayerAnimationState::WalkingUp
+            } else if dy < 0.0 {
+                PlayerAnimationState::WalkingDown
+            } else {
+                PlayerAnimationState::Walking
+            }
         };
         animation.update_state(animation_state);
     }
@@ -66,8 +73,9 @@ fn update_animation_atlas(mut query: Query<(&PlayerAnimation, &mut TextureAtlas)
 
 /// If the player is moving, play a step sound effect synchronized with the animation.
 fn trigger_step_sfx(mut commands: Commands, mut step_query: Query<&PlayerAnimation>) {
+    use PlayerAnimationState::*;
     for animation in &mut step_query {
-        if animation.state == PlayerAnimationState::Walking
+        if matches!(animation.state, Walking | WalkingUp | WalkingDown)
             && animation.changed()
             && (animation.frame == 2 || animation.frame == 5)
         {
@@ -86,15 +94,17 @@ pub struct PlayerAnimation {
     state: PlayerAnimationState,
 }
 
-#[derive(Reflect, PartialEq)]
+#[derive(Reflect, PartialEq, Clone, Copy)]
 pub enum PlayerAnimationState {
-    Idling,
-    Walking,
+    Idling = 0,
+    WalkingDown = 4 * 8,
+    WalkingUp = 5 * 8,
+    Walking = 6 * 8,
 }
 
 impl PlayerAnimation {
     /// The number of idle frames.
-    const IDLE_FRAMES: usize = 2;
+    const IDLE_FRAMES: usize = 8;
     /// The duration of each idle frame.
     const IDLE_INTERVAL: Duration = Duration::from_millis(500);
 
@@ -107,15 +117,15 @@ impl PlayerAnimation {
     }
 
     /// The number of walking frames.
-    const WALKING_FRAMES: usize = 6;
+    const WALKING_FRAMES: usize = 8;
     /// The duration of each walking frame.
     const WALKING_INTERVAL: Duration = Duration::from_millis(50);
 
-    fn walking() -> Self {
+    fn walking(state: PlayerAnimationState) -> Self {
         Self {
             timer: Timer::new(Self::WALKING_INTERVAL, TimerMode::Repeating),
             frame: 0,
-            state: PlayerAnimationState::Walking,
+            state,
         }
     }
 
@@ -125,23 +135,26 @@ impl PlayerAnimation {
 
     /// Update animation timers.
     pub fn update_timer(&mut self, delta: Duration) {
+        use PlayerAnimationState::*;
         self.timer.tick(delta);
         if !self.timer.finished() {
             return;
         }
         self.frame = (self.frame + 1)
             % match self.state {
-                PlayerAnimationState::Idling => Self::IDLE_FRAMES,
-                PlayerAnimationState::Walking => Self::WALKING_FRAMES,
+                Idling => Self::IDLE_FRAMES,
+                Walking | WalkingUp | WalkingDown => Self::WALKING_FRAMES,
             };
+        // dbg!(self.frame);
     }
 
     /// Update animation state if it changes.
     pub fn update_state(&mut self, state: PlayerAnimationState) {
+        use PlayerAnimationState::*;
         if self.state != state {
             match state {
-                PlayerAnimationState::Idling => *self = Self::idling(),
-                PlayerAnimationState::Walking => *self = Self::walking(),
+                Idling => *self = Self::idling(),
+                w@(Walking | WalkingUp | WalkingDown) => *self = Self::walking(w),
             }
         }
     }
@@ -153,9 +166,11 @@ impl PlayerAnimation {
 
     /// Return sprite index in the atlas.
     pub fn get_atlas_index(&self) -> usize {
-        match self.state {
-            PlayerAnimationState::Idling => self.frame,
-            PlayerAnimationState::Walking => 6 + self.frame,
-        }
+        self.state as usize + self.frame
+        // self.frame as
+        // match self.state {
+        //     PlayerAnimationState::Idling => self.frame,
+        //     PlayerAnimationState::Walking => 6 + self.frame,
+        // }
     }
 }

@@ -22,13 +22,15 @@ pub(super) fn plugin(app: &mut App) {
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn(LdtkWorldBundle {
         ldtk_handle: asset_server.load("levels/level0.ldtk"),
-        ..Default::default()
+        transform: Transform::from_xyz(0.,0.,1.0),
+        ..default()
     });
 }
 
 #[derive(PartialEq, Eq, Hash, Reflect)]
 pub enum ImageKey {
     Ducky,
+    Bunny
 }
 
 impl AssetKey for ImageKey {
@@ -46,7 +48,17 @@ impl FromWorld for HandleMap<ImageKey> {
                     settings.sampler = ImageSampler::nearest();
                 },
             ),
-        )]
+        ),
+         (
+            ImageKey::Bunny,
+            asset_server.load_with_settings(
+                "images/Premium Charakter Spritesheet.png",
+                |settings: &mut ImageLoaderSettings| {
+                    settings.sampler = ImageSampler::nearest();
+                },
+            ),
+        )
+        ]
         .into()
     }
 }
