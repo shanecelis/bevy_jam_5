@@ -3,8 +3,12 @@ use bevy::{
     render::texture::{ImageLoaderSettings, ImageSampler},
     utils::HashMap,
 };
+use bevy_ecs_ldtk::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
+    app.add_plugins(LdtkPlugin)
+        .insert_resource(LevelSelection::index(0))
+        .add_systems(Startup, setup);
     app.register_type::<HandleMap<ImageKey>>();
     app.init_resource::<HandleMap<ImageKey>>();
 
@@ -13,6 +17,13 @@ pub(super) fn plugin(app: &mut App) {
 
     app.register_type::<HandleMap<SoundtrackKey>>();
     app.init_resource::<HandleMap<SoundtrackKey>>();
+}
+
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.spawn(LdtkWorldBundle {
+        ldtk_handle: asset_server.load("levels/level0.ldtk"),
+        ..Default::default()
+    });
 }
 
 #[derive(PartialEq, Eq, Hash, Reflect)]
